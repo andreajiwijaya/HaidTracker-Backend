@@ -1,15 +1,15 @@
-import { Request, Response, NextFunction } from 'express';
+// src/middleware/authorizeMiddleware.ts
+import { Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from './authMiddleware';
 
 export const authorizeRole = (requiredRole: string) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const userRole = (req as any).userRole;
-
-    if (!userRole) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.userRole) {
       res.status(401).json({ error: 'User role not found, unauthorized' });
       return;
     }
 
-    if (userRole !== requiredRole) {
+    if (req.userRole !== requiredRole) {
       res.status(403).json({ error: 'Forbidden: insufficient rights' });
       return;
     }
