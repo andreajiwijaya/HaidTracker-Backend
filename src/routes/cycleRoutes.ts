@@ -5,11 +5,8 @@ import {
   createCycle,
   updateCycle,
   deleteCycle,
-  getCyclesByUser,
-  getCycleCount,
-  getMostRecentCycle,
-  getCyclesWithNotes,
   searchCycles,
+  getCycleStats, // tambahan
 } from '../controllers/cycleController';
 
 import { authenticateToken } from '../middleware/authMiddleware';
@@ -19,20 +16,15 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
-router.get('/', getCycles); 
-
-// Admin only
-router.get('/user/:userId', authorizeRole('admin'), getCyclesByUser); 
-
-// User only 
-router.get('/count', getCycleCount);
-router.get('/recent', getMostRecentCycle);
-router.get('/notes', getCyclesWithNotes);
+// Endpoint umum untuk semua user dan admin
+router.get('/', getCycles);
 router.get('/search', searchCycles);
-
 router.get('/:id', getCycleById);
 router.post('/', createCycle);
 router.put('/:id', updateCycle);
 router.delete('/:id', deleteCycle);
+
+// Endpoint khusus admin untuk statistik
+router.get('/stats', authorizeRole('admin'), getCycleStats);
 
 export default router;

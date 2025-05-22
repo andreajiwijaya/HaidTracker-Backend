@@ -6,24 +6,44 @@ const isValidDate = (dateStr: any): boolean => {
   return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
 };
 
+const parseUserId = (req: Request): number => {
+  return (req as any).userId;
+};
+
+const parseUserRole = (req: Request): string => {
+  return (req as any).role;
+};
+
 export const getCycles = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const cycles = await prisma.cycle.findMany({
-      where: { userId },
-      orderBy: { startDate: 'desc' },
-    });
+    const userId = parseUserId(req);
+    const role = parseUserRole(req);
+
+    let cycles;
+    if (role === 'admin') {
+      // Admin dapat semua siklus
+      cycles = await prisma.cycle.findMany({
+        orderBy: { startDate: 'desc' },
+      });
+    } else {
+      // User hanya siklus miliknya
+      cycles = await prisma.cycle.findMany({
+        where: { userId },
+        orderBy: { startDate: 'desc' },
+      });
+    }
     res.json(cycles);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch cycles' });
   }
 };
 
 export const getCycleById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const userRole = (req as any).role;
+    const userId = parseUserId(req);
+    const role = parseUserRole(req);
     const cycleId = Number(req.params.id);
+
     if (isNaN(cycleId)) {
       res.status(400).json({ error: 'Invalid cycle ID' });
       return;
@@ -35,7 +55,7 @@ export const getCycleById = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (userRole !== 'admin' && cycle.userId !== userId) {
+    if (role !== 'admin' && cycle.userId !== userId) {
       res.status(403).json({ error: 'Unauthorized to view this cycle' });
       return;
     }
@@ -48,8 +68,15 @@ export const getCycleById = async (req: Request, res: Response): Promise<void> =
 
 export const createCycle = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const { startDate, endDate, note } = req.body;
+    const userId = parseUserId(req);
+    const role = parseUserRole(req);
+    const { startDate, endDate, note, userId: targetUserId } = req.body;
+
+    // Validasi userId untuk admin (boleh buat siklus untuk user lain)
+    let actualUserId = userId;
+    if (role === 'admin' && typeof targetUserId === 'number') {
+      actualUserId = targetUserId;
+    }
 
     if (!startDate || !isValidDate(startDate)) {
       res.status(400).json({ error: 'startDate is required and must be a valid date' });
@@ -66,7 +93,7 @@ export const createCycle = async (req: Request, res: Response): Promise<void> =>
 
     const cycle = await prisma.cycle.create({
       data: {
-        userId,
+        userId: actualUserId,
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
         note,
@@ -81,9 +108,10 @@ export const createCycle = async (req: Request, res: Response): Promise<void> =>
 
 export const updateCycle = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const userRole = (req as any).role;
+    const userId = parseUserId(req);
+    const role = parseUserRole(req);
     const cycleId = Number(req.params.id);
+
     if (isNaN(cycleId)) {
       res.status(400).json({ error: 'Invalid cycle ID' });
       return;
@@ -95,7 +123,7 @@ export const updateCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    if (userRole !== 'admin' && existing.userId !== userId) {
+    if (role !== 'admin' && existing.userId !== userId) {
       res.status(403).json({ error: 'Unauthorized to update this cycle' });
       return;
     }
@@ -132,9 +160,10 @@ export const updateCycle = async (req: Request, res: Response): Promise<void> =>
 
 export const deleteCycle = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const userRole = (req as any).role;
+    const userId = parseUserId(req);
+    const role = parseUserRole(req);
     const cycleId = Number(req.params.id);
+
     if (isNaN(cycleId)) {
       res.status(400).json({ error: 'Invalid cycle ID' });
       return;
@@ -146,7 +175,7 @@ export const deleteCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    if (userRole !== 'admin' && existing.userId !== userId) {
+    if (role !== 'admin' && existing.userId !== userId) {
       res.status(403).json({ error: 'Unauthorized to delete this cycle' });
       return;
     }
@@ -158,87 +187,20 @@ export const deleteCycle = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const getCyclesByUser = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userRole = (req as any).role;
-    if (userRole !== 'admin') {
-      res.status(403).json({ error: 'Forbidden' });
-      return;
-    }
-
-    const userId = Number(req.params.userId);
-    if (isNaN(userId)) {
-      res.status(400).json({ error: 'Invalid user ID' });
-      return;
-    }
-
-    const cycles = await prisma.cycle.findMany({
-      where: { userId },
-      orderBy: { startDate: 'desc' },
-    });
-
-    res.json(cycles);
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch cycles by user' });
-  }
-};
-
-export const getCycleCount = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-
-    const count = await prisma.cycle.count({ where: { userId } });
-
-    res.json({ count });
-  } catch {
-    res.status(500).json({ error: 'Failed to get cycle count' });
-  }
-};
-
-export const getMostRecentCycle = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-
-    const recentCycle = await prisma.cycle.findFirst({
-      where: { userId },
-      orderBy: { startDate: 'desc' },
-    });
-
-    if (!recentCycle) {
-      res.status(404).json({ error: 'No cycles found' });
-      return;
-    }
-
-    res.json(recentCycle);
-  } catch {
-    res.status(500).json({ error: 'Failed to get most recent cycle' });
-  }
-};
-
-export const getCyclesWithNotes = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-
-    const cycles = await prisma.cycle.findMany({
-      where: {
-        userId,
-        note: { not: null },
-      },
-      orderBy: { startDate: 'desc' },
-    });
-
-    res.json(cycles);
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch cycles with notes' });
-  }
-};
-
 export const searchCycles = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = parseUserId(req);
+    const role = parseUserRole(req);
     const { noteKeyword, startDate } = req.query;
 
-    const where: any = { userId };
+    const where: any = {};
+
+    if (role === 'admin') {
+      // Admin bisa cari semua siklus, filter opsional
+    } else {
+      // User hanya siklus miliknya
+      where.userId = userId;
+    }
 
     if (noteKeyword && typeof noteKeyword === 'string') {
       where.note = { contains: noteKeyword, mode: 'insensitive' };
@@ -255,5 +217,26 @@ export const searchCycles = async (req: Request, res: Response): Promise<void> =
     res.json(cycles);
   } catch {
     res.status(500).json({ error: 'Failed to search cycles' });
+  }
+};
+
+// Hanya admin yang boleh akses
+export const getCycleStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const role = parseUserRole(req);
+    if (role !== 'admin') {
+      res.status(403).json({ error: 'Unauthorized to access statistics' });
+      return;
+    }
+
+    // Contoh: hitung jumlah siklus per user
+    const stats = await prisma.cycle.groupBy({
+      by: ['userId'],
+      _count: { id: true },
+    });
+
+    res.json(stats);
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch cycle statistics' });
   }
 };

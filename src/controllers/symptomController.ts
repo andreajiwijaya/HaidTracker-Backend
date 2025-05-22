@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 
-// Helper validasi tanggal ISO sederhana
 const isValidDate = (dateStr: any): boolean => {
   return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
 };
@@ -55,12 +54,12 @@ export const createSymptom = async (req: Request, res: Response): Promise<void> 
       res.status(400).json({ error: 'Date is required and must be valid ISO date' });
       return;
     }
-    if (!mood || typeof mood !== 'string') {
-      res.status(400).json({ error: 'Mood is required and must be a string' });
+    if (!mood || typeof mood !== 'string' || mood.trim() === '') {
+      res.status(400).json({ error: 'Mood is required and must be a non-empty string' });
       return;
     }
-    if (!symptoms || typeof symptoms !== 'string') {
-      res.status(400).json({ error: 'Symptoms are required and must be a string' });
+    if (!symptoms || typeof symptoms !== 'string' || symptoms.trim() === '') {
+      res.status(400).json({ error: 'Symptoms are required and must be a non-empty string' });
       return;
     }
 
@@ -68,8 +67,8 @@ export const createSymptom = async (req: Request, res: Response): Promise<void> 
       data: {
         userId,
         date: new Date(date),
-        mood,
-        symptoms,
+        mood: mood.trim(),
+        symptoms: symptoms.trim(),
       },
     });
 
@@ -105,12 +104,12 @@ export const updateSymptom = async (req: Request, res: Response): Promise<void> 
       res.status(400).json({ error: 'Date must be a valid ISO date if provided' });
       return;
     }
-    if (mood !== undefined && mood !== null && typeof mood !== 'string') {
-      res.status(400).json({ error: 'Mood must be a string or null if provided' });
+    if (mood !== undefined && mood !== null && (typeof mood !== 'string' || mood.trim() === '')) {
+      res.status(400).json({ error: 'Mood must be a non-empty string if provided' });
       return;
     }
-    if (symptoms !== undefined && symptoms !== null && typeof symptoms !== 'string') {
-      res.status(400).json({ error: 'Symptoms must be a string or null if provided' });
+    if (symptoms !== undefined && symptoms !== null && (typeof symptoms !== 'string' || symptoms.trim() === '')) {
+      res.status(400).json({ error: 'Symptoms must be a non-empty string if provided' });
       return;
     }
 
@@ -118,8 +117,8 @@ export const updateSymptom = async (req: Request, res: Response): Promise<void> 
       where: { id: symptomId },
       data: {
         date: date ? new Date(date) : existing.date,
-        mood: mood ?? existing.mood,
-        symptoms: symptoms ?? existing.symptoms,
+        mood: mood ? mood.trim() : existing.mood,
+        symptoms: symptoms ? symptoms.trim() : existing.symptoms,
       },
     });
 
@@ -156,7 +155,7 @@ export const deleteSymptom = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Endpoint 6: Get symptoms by userId (admin only)
+// Admin only: Get symptoms by userId
 export const getSymptomsByUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const userRole = (req as any).role;
@@ -179,100 +178,5 @@ export const getSymptomsByUser = async (req: Request, res: Response): Promise<vo
     res.json(symptoms);
   } catch {
     res.status(500).json({ error: 'Failed to fetch symptoms by user' });
-  }
-};
-
-// Endpoint 7: Get count of user's symptoms
-export const getSymptomCount = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-    const count = await prisma.symptom.count({ where: { userId } });
-    res.json({ count });
-  } catch {
-    res.status(500).json({ error: 'Failed to get symptom count' });
-  }
-};
-
-// Endpoint 8: Get most recent symptom entry
-export const getMostRecentSymptom = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-    const recent = await prisma.symptom.findFirst({
-      where: { userId },
-      orderBy: { date: 'desc' },
-    });
-    if (!recent) {
-      res.status(404).json({ error: 'No symptoms found' });
-      return;
-    }
-    res.json(recent);
-  } catch {
-    res.status(500).json({ error: 'Failed to get most recent symptom' });
-  }
-};
-
-// Endpoint 9: Get symptoms with mood matching keyword (case-insensitive)
-export const getSymptomsByMoodKeyword = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-    const { moodKeyword } = req.query;
-
-    if (!moodKeyword || typeof moodKeyword !== 'string') {
-      res.status(400).json({ error: 'moodKeyword query parameter is required and must be a string' });
-      return;
-    }
-
-    const symptoms = await prisma.symptom.findMany({
-      where: {
-        userId,
-        mood: { contains: moodKeyword, mode: 'insensitive' },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    res.json(symptoms);
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch symptoms by mood keyword' });
-  }
-};
-
-// Endpoint 10: Search symptoms by date range or symptoms keyword
-export const searchSymptoms = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId;
-    const { startDate, endDate, symptomKeyword } = req.query;
-
-    const where: any = { userId };
-
-    if (startDate && typeof startDate === 'string') {
-      if (!isValidDate(startDate)) {
-        res.status(400).json({ error: 'startDate must be a valid ISO date' });
-        return;
-      }
-      where.date = { gte: new Date(startDate) };
-    }
-
-    if (endDate && typeof endDate === 'string') {
-      if (!isValidDate(endDate)) {
-        res.status(400).json({ error: 'endDate must be a valid ISO date' });
-        return;
-      }
-      where.date = where.date
-        ? { ...where.date, lte: new Date(endDate) }
-        : { lte: new Date(endDate) };
-    }
-
-    if (symptomKeyword && typeof symptomKeyword === 'string') {
-      where.symptoms = { contains: symptomKeyword, mode: 'insensitive' };
-    }
-
-    const symptoms = await prisma.symptom.findMany({
-      where,
-      orderBy: { date: 'desc' },
-    });
-
-    res.json(symptoms);
-  } catch {
-    res.status(500).json({ error: 'Failed to search symptoms' });
   }
 };

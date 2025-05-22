@@ -8,15 +8,17 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
   name      String?
   password  String
-  role      String    @default("user")
+  role      String     @default("user")
   cycles    Cycle[]
   symptoms  Symptom[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  reminders Reminder[]
+  analytics Analytic[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 model Cycle {
@@ -39,4 +41,28 @@ model Symptom {
   symptoms  String?   // misal JSON string atau comma separated
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+model Reminder {
+  id          Int       @id @default(autoincrement())
+  user        User      @relation(fields: [userId], references: [id])
+  userId      Int
+  title       String
+  description String?
+  remindAt    DateTime  // waktu pengingat
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Analytic {
+  id             Int       @id @default(autoincrement())
+  user           User      @relation(fields: [userId], references: [id])
+  userId         Int
+  periodStart    DateTime  // periode awal analitik
+  periodEnd      DateTime  // periode akhir analitik
+  averageCycle   Float?    // contoh: rata-rata panjang siklus (hari)
+  symptomSummary String?   // ringkasan gejala dalam periode (misal JSON string)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
