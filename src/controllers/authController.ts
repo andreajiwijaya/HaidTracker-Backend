@@ -56,31 +56,32 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
+
   if (!email || !password) {
-    res.status(400).json({ error: 'Email and password are required' });
+    res.status(400).json({ error: 'Email dan password wajib diisi' });
     return;
   }
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.password) {
-      res.status(400).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Email atau password salah' });
       return;
     }
 
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Email atau password salah' });
       return;
     }
 
     const token = jwt.sign(
-      { userId: user.id, role: user.role }, 
+      { userId: user.id, role: user.role },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    res.json({
+    res.status(200).json({
       token,
       user: {
         id: user.id,
@@ -90,6 +91,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: 'Server error during login' });
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server saat login' });
   }
 };
+
