@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
-  const { email, name, password } = req.body;
+  const { email, name, password, role } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'Email and password are required' });
     return;
@@ -21,8 +21,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Validasi role hanya boleh 'user' atau 'admin'
+    const validRoles = ['user', 'admin'];
+    const assignedRole = validRoles.includes(role) ? role : 'user';
+
     const user = await prisma.user.create({
-      data: { email, name, password: hashedPassword, role: 'user' },
+      data: {
+        email,
+        name,
+        password: hashedPassword,
+        role: assignedRole,
+      },
     });
 
     const token = jwt.sign(
