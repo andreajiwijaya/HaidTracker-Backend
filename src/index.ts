@@ -1,10 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import cycleRoutes from './routes/cycleRoutes';
 import symptomRoutes from './routes/symptomRoutes';
+import reminderRoutes from './routes/reminderRoutes';
+import analyticRoutes from './routes/analyticRoutes';
 
 dotenv.config();
 
@@ -18,19 +21,13 @@ app.get('/', (req, res) => {
   res.send('🚀 Welcome to HaidTracker API');
 });
 
-// Auth (login & register)
 app.use('/auth', authRoutes);
-
-// User management (admin only)
 app.use('/users', userRoutes);
-
-// Cycle tracking
 app.use('/cycles', cycleRoutes);
-
-// Symptom tracking
 app.use('/symptoms', symptomRoutes);
+app.use('/reminders', reminderRoutes);
+app.use('/analytics', analyticRoutes);
 
-// Fallback 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
