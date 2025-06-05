@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 // Validasi email sederhana
 const isValidEmail = (email: any): boolean => {
@@ -13,9 +14,8 @@ const isValidPassword = (password: any): boolean => {
 };
 
 // Create user (only admin)
-export const createUser = async (req: Request, res: Response): Promise<void> => {
-  // Pastikan req punya user info hasil authenticate
-  const requesterRole = (req as any).role;
+export const createUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const requesterRole = req.userRole;
   if (requesterRole !== 'admin') {
     res.status(403).json({ error: 'Forbidden: Admin only' });
     return;
@@ -55,10 +55,10 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 };
 
 // Get user by id (admin or self)
-export const getUserById = async (req: Request, res: Response): Promise<void> => {
+export const getUserById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const requesterId = (req as any).userId;
-    const requesterRole = (req as any).role;
+    const requesterId = req.userId;
+    const requesterRole = req.userRole;
     const userId = Number(req.params.id);
 
     if (isNaN(userId)) {
@@ -88,10 +88,10 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
 };
 
 // Update user (admin or self)
-export const updateUser = async (req: Request, res: Response): Promise<void> => {
+export const updateUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const requesterId = (req as any).userId;
-    const requesterRole = (req as any).role;
+    const requesterId = req.userId;
+    const requesterRole = req.userRole;
     const userId = Number(req.params.id);
     const { email, name, password, role } = req.body;
 
@@ -100,7 +100,6 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // User biasa hanya bisa update diri sendiri, admin bisa update siapa saja
     if (requesterRole !== 'admin' && requesterId !== userId) {
       res.status(403).json({ error: 'Forbidden' });
       return;
@@ -139,7 +138,6 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
       dataToUpdate.password = await bcrypt.hash(password, 10);
     }
 
-    // Hanya admin yang bisa update role
     if (role) {
       if (requesterRole !== 'admin') {
         res.status(403).json({ error: 'Only admin can update role' });
@@ -165,10 +163,10 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
 };
 
 // Delete user (admin or self)
-export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+export const deleteUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const requesterId = (req as any).userId;
-    const requesterRole = (req as any).role;
+    const requesterId = req.userId;
+    const requesterRole = req.userRole;
     const userId = Number(req.params.id);
 
     if (isNaN(userId)) {
@@ -195,9 +193,9 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
 };
 
 // Get own profile (self only)
-export const getProfile = async (req: Request, res: Response): Promise<void> => {
+export const getProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.userId;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -216,9 +214,9 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
 };
 
 // Update own profile (self only)
-export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+export const updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.userId;
     const { email, name, password } = req.body;
 
     const dataToUpdate: any = {};

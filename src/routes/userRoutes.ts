@@ -13,15 +13,20 @@ import { authorizeRole } from '../middleware/authorizeMiddleware';
 
 const router = express.Router();
 
+// Semua route di bawah harus autentikasi dulu
 router.use(authenticateToken);
 
-router.post('/', authenticateToken, authorizeRole('admin'), createUser);
+// Route untuk create user (hanya admin)
+router.post('/', authorizeRole('admin'), createUser);
 
+// Pastikan route spesifik 'profile' diletakkan sebelum parameter ':id'
+// supaya tidak tertangkap sebagai id
+router.get('/profile', getProfile);
+router.put('/profile', updateProfile);
+
+// Routes user berdasarkan id (admin atau user itu sendiri)
 router.get('/:id', getUserById);
 router.put('/:id', updateUser);
 router.delete('/:id', deleteUser);
-
-router.get('/profile', getProfile);
-router.put('/profile', updateProfile);
 
 export default router;
