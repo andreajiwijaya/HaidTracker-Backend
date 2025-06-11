@@ -18,6 +18,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+app.use((req, res, next) => {
+    console.log(`➡️ Request received: ${req.method} ${req.originalUrl}`);
+    next();
+});
 // Root route
 app.get('/', (req, res) => {
     res.send('🚀 Welcome to HaidTracker API');

@@ -17,6 +17,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`➡️ Request received: ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // Root route
 app.get('/', (req, res) => {
