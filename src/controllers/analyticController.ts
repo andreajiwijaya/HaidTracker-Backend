@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { prisma } from '../prisma';
+import * as analyticService from '../services/analyticService';
 
-// Validasi ISO Date
 const isValidISODateString = (dateStr: any): boolean => {
   return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
 };
@@ -9,10 +8,7 @@ const isValidISODateString = (dateStr: any): boolean => {
 // 1. Admin: Get all analytics
 export const getAllAnalyticsForAdmin = async (req: Request, res: Response): Promise<void> => {
   try {
-    const analytics = await prisma.analytic.findMany({
-      include: { user: { select: { id: true, email: true, name: true } } },
-      orderBy: { periodStart: 'desc' }, // gunakan field yang ada
-    });
+    const analytics = await analyticService.getAllAnalytics();
     res.json(analytics);
   } catch {
     res.status(500).json({ error: 'Failed to fetch analytics' });
@@ -23,10 +19,7 @@ export const getAllAnalyticsForAdmin = async (req: Request, res: Response): Prom
 export const getUserAnalytics = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).userId;
-    const analytics = await prisma.analytic.findMany({
-      where: { userId },
-      orderBy: { periodStart: 'desc' },
-    });
+    const analytics = await analyticService.getAnalyticsByUserId(userId);
     res.json(analytics);
   } catch {
     res.status(500).json({ error: 'Failed to fetch your analytics' });
@@ -44,14 +37,11 @@ export const createAnalytic = async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    const analytic = await prisma.analytic.create({
-      data: {
-        userId,
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
-        averageCycle,
-        symptomSummary,
-      },
+    const analytic = await analyticService.createAnalyticForUser(userId, {
+      periodStart,
+      periodEnd,
+      averageCycle,
+      symptomSummary,
     });
     res.status(201).json(analytic);
   } catch {
@@ -72,10 +62,7 @@ export const updateAnalytic = async (req: Request, res: Response): Promise<void>
     const userRole = (req as any).userRole;
     const { periodStart, periodEnd, averageCycle, symptomSummary } = req.body;
 
-    const existingAnalytic = await prisma.analytic.findUnique({
-      where: { id: analyticId },
-    });
-
+    const existingAnalytic = await analyticService.getAnalyticById(analyticId);
     if (!existingAnalytic) {
       res.status(404).json({ error: 'Analytic not found' });
       return;
@@ -87,28 +74,20 @@ export const updateAnalytic = async (req: Request, res: Response): Promise<void>
     }
 
     const dataToUpdate: any = {};
-
     if (periodStart && isValidISODateString(periodStart)) {
       dataToUpdate.periodStart = new Date(periodStart);
     }
-
     if (periodEnd && isValidISODateString(periodEnd)) {
       dataToUpdate.periodEnd = new Date(periodEnd);
     }
-
     if (averageCycle !== undefined) {
       dataToUpdate.averageCycle = averageCycle;
     }
-
     if (symptomSummary !== undefined) {
       dataToUpdate.symptomSummary = symptomSummary;
     }
 
-    const updatedAnalytic = await prisma.analytic.update({
-      where: { id: analyticId },
-      data: dataToUpdate,
-    });
-
+    const updatedAnalytic = await analyticService.updateAnalyticById(analyticId, dataToUpdate);
     res.json(updatedAnalytic);
   } catch {
     res.status(500).json({ error: 'Failed to update analytic' });
@@ -127,10 +106,7 @@ export const deleteAnalytic = async (req: Request, res: Response): Promise<void>
     const userId = (req as any).userId;
     const userRole = (req as any).userRole;
 
-    const existingAnalytic = await prisma.analytic.findUnique({
-      where: { id: analyticId },
-    });
-
+    const existingAnalytic = await analyticService.getAnalyticById(analyticId);
     if (!existingAnalytic) {
       res.status(404).json({ error: 'Analytic not found' });
       return;
@@ -141,7 +117,7 @@ export const deleteAnalytic = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    await prisma.analytic.delete({ where: { id: analyticId } });
+    await analyticService.deleteAnalyticById(analyticId);
     res.status(204).send();
   } catch {
     res.status(500).json({ error: 'Failed to delete analytic' });
@@ -160,10 +136,7 @@ export const getAnalyticById = async (req: Request, res: Response): Promise<void
     const userId = (req as any).userId;
     const userRole = (req as any).userRole;
 
-    const analytic = await prisma.analytic.findUnique({
-      where: { id: analyticId },
-    });
-
+    const analytic = await analyticService.getAnalyticById(analyticId);
     if (!analytic) {
       res.status(404).json({ error: 'Analytic not found' });
       return;
@@ -179,3 +152,4 @@ export const getAnalyticById = async (req: Request, res: Response): Promise<void
     res.status(500).json({ error: 'Failed to fetch analytic' });
   }
 };
+// 7. Get analytics by user ID (admin only)

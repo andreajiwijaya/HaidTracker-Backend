@@ -20,7 +20,6 @@ router.use(authenticateToken);
 router.post('/', authorizeRole('admin'), createUser);
 
 // Pastikan route spesifik 'profile' diletakkan sebelum parameter ':id'
-// supaya tidak tertangkap sebagai id
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 

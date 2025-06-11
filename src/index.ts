@@ -14,24 +14,29 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Root route
 app.get('/', (req, res) => {
   res.send('🚀 Welcome to HaidTracker API');
 });
 
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/cycles', cycleRoutes);
-app.use('/symptoms', symptomRoutes);
-app.use('/reminders', reminderRoutes);
-app.use('/analytics', analyticRoutes);
+// Main API routes with /api prefix
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/cycles', cycleRoutes);
+app.use('/api/symptoms', symptomRoutes);
+app.use('/api/reminders', reminderRoutes);
+app.use('/api/analytics', analyticRoutes);
 
+// 404 fallback for undefined routes
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
+// Server listen
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

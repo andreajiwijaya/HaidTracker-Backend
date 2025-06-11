@@ -15,7 +15,6 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/all', authorizeRole('admin'), getAllRemindersForAdmin);
-
 router.get('/', getUserReminders);
 router.post('/', createReminder);
 router.get('/:id', getReminderById);

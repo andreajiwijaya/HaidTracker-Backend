@@ -1,37 +1,17 @@
 import { Request, Response } from 'express';
-import { prisma } from '../prisma';
+import * as cycleService from '../services/cycleService';
 
-// Helper: validasi tanggal ISO sederhana
-const isValidDate = (dateStr: any): boolean => {
-  return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
-};
+const isValidDate = (dateStr: any): boolean =>
+  typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
 
-const parseUserId = (req: Request): number => {
-  return (req as any).userId;
-};
-
-const parseUserRole = (req: Request): string => {
-  return (req as any).role;
-};
+const parseUserId = (req: Request): number => (req as any).userId;
+const parseUserRole = (req: Request): string => (req as any).role;
 
 export const getCycles = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = parseUserId(req);
     const role = parseUserRole(req);
-
-    let cycles;
-    if (role === 'admin') {
-      // Admin dapat semua siklus
-      cycles = await prisma.cycle.findMany({
-        orderBy: { startDate: 'desc' },
-      });
-    } else {
-      // User hanya siklus miliknya
-      cycles = await prisma.cycle.findMany({
-        where: { userId },
-        orderBy: { startDate: 'desc' },
-      });
-    }
+    const cycles = await cycleService.getAllCycles(userId, role);
     res.json(cycles);
   } catch {
     res.status(500).json({ error: 'Failed to fetch cycles' });
@@ -49,7 +29,7 @@ export const getCycleById = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const cycle = await prisma.cycle.findUnique({ where: { id: cycleId } });
+    const cycle = await cycleService.getCycle(cycleId);
     if (!cycle) {
       res.status(404).json({ error: 'Cycle not found' });
       return;
@@ -72,12 +52,6 @@ export const createCycle = async (req: Request, res: Response): Promise<void> =>
     const role = parseUserRole(req);
     const { startDate, endDate, note, userId: targetUserId } = req.body;
 
-    // Validasi userId untuk admin (boleh buat siklus untuk user lain)
-    let actualUserId = userId;
-    if (role === 'admin' && typeof targetUserId === 'number') {
-      actualUserId = targetUserId;
-    }
-
     if (!startDate || !isValidDate(startDate)) {
       res.status(400).json({ error: 'startDate is required and must be a valid date' });
       return;
@@ -91,13 +65,11 @@ export const createCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const cycle = await prisma.cycle.create({
-      data: {
-        userId: actualUserId,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
-        note,
-      },
+    const cycle = await cycleService.createCycleEntry(userId, role, {
+      startDate,
+      endDate,
+      note,
+      targetUserId,
     });
 
     res.status(201).json(cycle);
@@ -117,7 +89,7 @@ export const updateCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const existing = await prisma.cycle.findUnique({ where: { id: cycleId } });
+    const existing = await cycleService.getCycle(cycleId);
     if (!existing) {
       res.status(404).json({ error: 'Cycle not found' });
       return;
@@ -143,16 +115,8 @@ export const updateCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const updatedCycle = await prisma.cycle.update({
-      where: { id: cycleId },
-      data: {
-        startDate: startDate ? new Date(startDate) : existing.startDate,
-        endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : existing.endDate,
-        note: note !== undefined ? note : existing.note,
-      },
-    });
-
-    res.json(updatedCycle);
+    const updated = await cycleService.updateCycleEntry(cycleId, { startDate, endDate, note });
+    res.json(updated);
   } catch {
     res.status(500).json({ error: 'Failed to update cycle' });
   }
@@ -169,7 +133,7 @@ export const deleteCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const existing = await prisma.cycle.findUnique({ where: { id: cycleId } });
+    const existing = await cycleService.getCycle(cycleId);
     if (!existing) {
       res.status(404).json({ error: 'Cycle not found' });
       return;
@@ -180,7 +144,7 @@ export const deleteCycle = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    await prisma.cycle.delete({ where: { id: cycleId } });
+    await cycleService.deleteCycleEntry(cycleId);
     res.status(204).send();
   } catch {
     res.status(500).json({ error: 'Failed to delete cycle' });
@@ -193,25 +157,9 @@ export const searchCycles = async (req: Request, res: Response): Promise<void> =
     const role = parseUserRole(req);
     const { noteKeyword, startDate } = req.query;
 
-    const where: any = {};
-
-    if (role === 'admin') {
-      // Admin bisa cari semua siklus, filter opsional
-    } else {
-      // User hanya siklus miliknya
-      where.userId = userId;
-    }
-
-    if (noteKeyword && typeof noteKeyword === 'string') {
-      where.note = { contains: noteKeyword, mode: 'insensitive' };
-    }
-    if (startDate && typeof startDate === 'string' && isValidDate(startDate)) {
-      where.startDate = new Date(startDate);
-    }
-
-    const cycles = await prisma.cycle.findMany({
-      where,
-      orderBy: { startDate: 'desc' },
+    const cycles = await cycleService.searchUserCycles(userId, role, {
+      noteKeyword: noteKeyword as string,
+      startDate: startDate as string,
     });
 
     res.json(cycles);
@@ -220,7 +168,6 @@ export const searchCycles = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// Hanya admin yang boleh akses
 export const getCycleStats = async (req: Request, res: Response): Promise<void> => {
   try {
     const role = parseUserRole(req);
@@ -229,12 +176,7 @@ export const getCycleStats = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Contoh: hitung jumlah siklus per user
-    const stats = await prisma.cycle.groupBy({
-      by: ['userId'],
-      _count: { id: true },
-    });
-
+    const stats = await cycleService.getCycleStatistics();
     res.json(stats);
   } catch {
     res.status(500).json({ error: 'Failed to fetch cycle statistics' });

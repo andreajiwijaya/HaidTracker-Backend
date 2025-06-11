@@ -15,7 +15,6 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/all', authorizeRole('admin'), getAllAnalyticsForAdmin);
-
 router.get('/', getUserAnalytics);
 router.post('/', createAnalytic);
 router.get('/:id', getAnalyticById);

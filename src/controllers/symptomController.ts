@@ -1,40 +1,33 @@
 import { Request, Response } from 'express';
-import { prisma } from '../prisma';
-
-const isValidDate = (dateStr: any): boolean => {
-  return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
-};
+import * as symptomService from '../services/symptomService';
 
 export const getSymptoms = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).userId;
-    const symptoms = await prisma.symptom.findMany({
-      where: { userId },
-      orderBy: { date: 'desc' },
-    });
+    const symptoms = await symptomService.getSymptoms(userId);
     res.json(symptoms);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch symptoms' });
   }
 };
 
 export const getSymptomById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const userRole = (req as any).role;
     const symptomId = Number(req.params.id);
     if (isNaN(symptomId)) {
       res.status(400).json({ error: 'Invalid symptom ID' });
       return;
     }
 
-    const symptom = await prisma.symptom.findUnique({ where: { id: symptomId } });
+    const { userId, role } = req as any;
+    const symptom = await symptomService.getSymptomById(symptomId);
+
     if (!symptom) {
       res.status(404).json({ error: 'Symptom not found' });
       return;
     }
 
-    if (userRole !== 'admin' && symptom.userId !== userId) {
+    if (role !== 'admin' && symptom.userId !== userId) {
       res.status(403).json({ error: 'Unauthorized to view this symptom' });
       return;
     }
@@ -50,116 +43,74 @@ export const createSymptom = async (req: Request, res: Response): Promise<void> 
     const userId = (req as any).userId;
     const { date, mood, symptoms } = req.body;
 
-    if (!date || !isValidDate(date)) {
-      res.status(400).json({ error: 'Date is required and must be valid ISO date' });
-      return;
-    }
-    if (!mood || typeof mood !== 'string' || mood.trim() === '') {
-      res.status(400).json({ error: 'Mood is required and must be a non-empty string' });
-      return;
-    }
-    if (!symptoms || typeof symptoms !== 'string' || symptoms.trim() === '') {
-      res.status(400).json({ error: 'Symptoms are required and must be a non-empty string' });
-      return;
-    }
-
-    const symptom = await prisma.symptom.create({
-      data: {
-        userId,
-        date: new Date(date),
-        mood: mood.trim(),
-        symptoms: symptoms.trim(),
-      },
-    });
-
-    res.status(201).json(symptom);
-  } catch {
-    res.status(500).json({ error: 'Failed to create symptom' });
+    const newSymptom = await symptomService.createSymptom(userId, date, mood, symptoms);
+    res.status(201).json(newSymptom);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 };
 
 export const updateSymptom = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const userRole = (req as any).role;
     const symptomId = Number(req.params.id);
     if (isNaN(symptomId)) {
       res.status(400).json({ error: 'Invalid symptom ID' });
       return;
     }
 
-    const existing = await prisma.symptom.findUnique({ where: { id: symptomId } });
+    const { userId, role } = req as any;
+    const existing = await symptomService.getSymptomById(symptomId);
+
     if (!existing) {
       res.status(404).json({ error: 'Symptom not found' });
       return;
     }
-    if (userRole !== 'admin' && existing.userId !== userId) {
+
+    if (role !== 'admin' && existing.userId !== userId) {
       res.status(403).json({ error: 'Unauthorized to update this symptom' });
       return;
     }
 
     const { date, mood, symptoms } = req.body;
-
-    if (date !== undefined && date !== null && !isValidDate(date)) {
-      res.status(400).json({ error: 'Date must be a valid ISO date if provided' });
-      return;
-    }
-    if (mood !== undefined && mood !== null && (typeof mood !== 'string' || mood.trim() === '')) {
-      res.status(400).json({ error: 'Mood must be a non-empty string if provided' });
-      return;
-    }
-    if (symptoms !== undefined && symptoms !== null && (typeof symptoms !== 'string' || symptoms.trim() === '')) {
-      res.status(400).json({ error: 'Symptoms must be a non-empty string if provided' });
-      return;
-    }
-
-    const updatedSymptom = await prisma.symptom.update({
-      where: { id: symptomId },
-      data: {
-        date: date ? new Date(date) : existing.date,
-        mood: mood ? mood.trim() : existing.mood,
-        symptoms: symptoms ? symptoms.trim() : existing.symptoms,
-      },
-    });
-
-    res.json(updatedSymptom);
-  } catch {
-    res.status(500).json({ error: 'Failed to update symptom' });
+    const updated = await symptomService.updateSymptom(symptomId, date, mood, symptoms);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to update symptom' });
   }
 };
 
 export const deleteSymptom = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
-    const userRole = (req as any).role;
     const symptomId = Number(req.params.id);
     if (isNaN(symptomId)) {
       res.status(400).json({ error: 'Invalid symptom ID' });
       return;
     }
 
-    const existing = await prisma.symptom.findUnique({ where: { id: symptomId } });
+    const { userId, role } = req as any;
+    const existing = await symptomService.getSymptomById(symptomId);
+
     if (!existing) {
       res.status(404).json({ error: 'Symptom not found' });
       return;
     }
-    if (userRole !== 'admin' && existing.userId !== userId) {
+
+    if (role !== 'admin' && existing.userId !== userId) {
       res.status(403).json({ error: 'Unauthorized to delete this symptom' });
       return;
     }
 
-    await prisma.symptom.delete({ where: { id: symptomId } });
+    await symptomService.deleteSymptom(symptomId);
     res.status(204).send();
   } catch {
     res.status(500).json({ error: 'Failed to delete symptom' });
   }
 };
 
-// Admin only: Get symptoms by userId
 export const getSymptomsByUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userRole = (req as any).role;
-    if (userRole !== 'admin') {
+    const role = (req as any).role;
+    if (role !== 'admin') {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
@@ -170,11 +121,7 @@ export const getSymptomsByUser = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const symptoms = await prisma.symptom.findMany({
-      where: { userId },
-      orderBy: { date: 'desc' },
-    });
-
+    const symptoms = await symptomService.getSymptoms(userId);
     res.json(symptoms);
   } catch {
     res.status(500).json({ error: 'Failed to fetch symptoms by user' });
