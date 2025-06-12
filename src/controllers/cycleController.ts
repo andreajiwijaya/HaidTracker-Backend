@@ -161,6 +161,7 @@ export const searchCycles = async (req: AuthenticatedRequest, res: Response): Pr
 };
 
 export const getCycleStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  console.log('DEBUG: cycleController/getCycleStats - User ID:', req.userId, 'Role:', req.userRole);
   try {
     const role = req.userRole!;
     // Middleware authorizeRole sudah mengurus ini, tapi validasi di controller/service juga bisa

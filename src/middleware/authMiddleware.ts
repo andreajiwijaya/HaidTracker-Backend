@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import AppError from '../utils/AppError';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_SECRET = process.env.JWT_SECRET || 'tracker-haid-key-1';
 
 export interface AuthenticatedRequest extends Request {
   userId?: number;
@@ -31,6 +31,7 @@ export const authenticateToken = (
     const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
     req.userId = payload.userId;
     req.userRole = payload.role;
+    console.log('DEBUG: authMiddleware - User ID:', req.userId, 'Role:', req.userRole);
     next();
   } catch (error) {
     throw new AppError('Token tidak valid atau kedaluwarsa.', 403);

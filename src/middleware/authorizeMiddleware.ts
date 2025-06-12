@@ -5,6 +5,7 @@ import AppError from '../utils/AppError';
 
 export const authorizeRole = (requiredRole: string) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    console.log('DEBUG: authorizeMiddleware - Checking for role:', requiredRole, 'Current user role:', req.userRole);
     if (!req.userRole) {
       throw new AppError('Peran pengguna tidak ditemukan, tidak terotorisasi.', 401);
     }

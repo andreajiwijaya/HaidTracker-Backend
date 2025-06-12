@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import AppError from '../utils/AppError'; // Import AppError
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey'; // Pastikan ini diatur di .env!
+const JWT_SECRET = process.env.JWT_SECRET || 'tracker-haid-key-1'; // Pastikan ini diatur di .env!
 
 interface AuthPayload {
   email: string;
