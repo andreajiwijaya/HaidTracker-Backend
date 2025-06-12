@@ -32,36 +32,137 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProfile = exports.getProfile = exports.deleteUser = exports.updateUser = exports.getUserById = exports.createUser = void 0;
+exports.updateProfile = exports.getProfile = exports.deleteUser = exports.updateUser = exports.getUserById = exports.getAllUsers = exports.createUser = void 0;
 const userService = __importStar(require("../services/userService"));
+const AppError_1 = __importDefault(require("../utils/AppError"));
 // Create user (only admin)
 const createUser = async (req, res) => {
-    await userService.createUser(req, res);
+    try {
+        const user = await userService.createUser(req.body, req.userRole);
+        res.status(201).json(user);
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal membuat pengguna baru.' });
+        }
+    }
 };
 exports.createUser = createUser;
+// Get all users (admin only)
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await userService.getAllUsers(req.userRole);
+        res.json(users);
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil daftar pengguna.' });
+        }
+    }
+};
+exports.getAllUsers = getAllUsers;
 // Get user by id (admin or self)
 const getUserById = async (req, res) => {
-    await userService.getUserById(req, res);
+    try {
+        const userId = Number(req.params.id);
+        if (isNaN(userId)) {
+            res.status(400).json({ error: 'ID pengguna tidak valid.' });
+            return;
+        }
+        const user = await userService.getUserById(userId, req.userId, req.userRole);
+        res.json(user);
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil detail pengguna.' });
+        }
+    }
 };
 exports.getUserById = getUserById;
 // Update user (admin or self)
 const updateUser = async (req, res) => {
-    await userService.updateUser(req, res);
+    try {
+        const targetUserId = Number(req.params.id);
+        if (isNaN(targetUserId)) {
+            res.status(400).json({ error: 'ID pengguna tidak valid.' });
+            return;
+        }
+        const updatedUser = await userService.updateUser(targetUserId, req.body, req.userId, req.userRole);
+        res.json(updatedUser);
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal memperbarui pengguna.' });
+        }
+    }
 };
 exports.updateUser = updateUser;
 // Delete user (admin or self)
 const deleteUser = async (req, res) => {
-    await userService.deleteUser(req, res);
+    try {
+        const targetUserId = Number(req.params.id);
+        if (isNaN(targetUserId)) {
+            res.status(400).json({ error: 'ID pengguna tidak valid.' });
+            return;
+        }
+        await userService.deleteUser(targetUserId, req.userId, req.userRole);
+        res.status(204).send();
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal menghapus pengguna.' });
+        }
+    }
 };
 exports.deleteUser = deleteUser;
 // Get own profile (self only)
 const getProfile = async (req, res) => {
-    await userService.getProfile(req, res);
+    try {
+        const user = await userService.getProfile(req.userId);
+        res.json(user);
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil profil.' });
+        }
+    }
 };
 exports.getProfile = getProfile;
 // Update own profile (self only)
 const updateProfile = async (req, res) => {
-    await userService.updateProfile(req, res);
+    try {
+        const updatedUser = await userService.updateProfile(req.userId, req.body);
+        res.json(updatedUser);
+    }
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal memperbarui profil.' });
+        }
+    }
 };
 exports.updateProfile = updateProfile;

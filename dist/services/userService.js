@@ -3,225 +3,184 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProfile = exports.getProfile = exports.deleteUser = exports.updateUser = exports.getUserById = exports.createUser = void 0;
+exports.getAllUsers = exports.updateProfile = exports.getProfile = exports.deleteUser = exports.updateUser = exports.getUserById = exports.createUser = void 0;
 const prisma_1 = require("../prisma");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const AppError_1 = __importDefault(require("../utils/AppError")); // Import AppError
 const isValidEmail = (email) => {
     return typeof email === 'string' && /\S+@\S+\.\S+/.test(email);
 };
 const isValidPassword = (password) => {
     return typeof password === 'string' && password.length >= 6;
 };
-const createUser = async (req, res) => {
-    const requesterRole = req.userRole;
+// Fungsi createUser di service tidak lagi mengambil `res`
+const createUser = async (userData, requesterRole) => {
     if (requesterRole !== 'admin') {
-        res.status(403).json({ error: 'Forbidden: Admin only' });
-        return;
+        throw new AppError_1.default('Terlarang: Hanya admin yang dapat membuat pengguna baru.', 403);
     }
-    const { email, name, password, role } = req.body;
+    const { email, name, password, role } = userData;
     if (!email || !isValidEmail(email)) {
-        res.status(400).json({ error: 'Valid email is required' });
-        return;
+        throw new AppError_1.default('Email yang valid wajib diisi.', 400);
     }
     if (!password || !isValidPassword(password)) {
-        res.status(400).json({ error: 'Password of minimum 6 characters is required' });
-        return;
+        throw new AppError_1.default('Password minimal 6 karakter wajib diisi.', 400);
     }
     if (role && !['user', 'admin'].includes(role)) {
-        res.status(400).json({ error: 'Invalid role' });
-        return;
+        throw new AppError_1.default('Peran tidak valid.', 400);
     }
-    try {
-        const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
-            res.status(409).json({ error: 'Email already exists' });
-            return;
-        }
-        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
-        const user = await prisma_1.prisma.user.create({
-            data: { email, name, password: hashedPassword, role: role || 'user' },
-            select: { id: true, email: true, name: true, role: true }
-        });
-        res.status(201).json(user);
+    const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+        throw new AppError_1.default('Email sudah terdaftar.', 409);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to create user' });
-    }
+    const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+    const user = await prisma_1.prisma.user.create({
+        data: { email, name, password: hashedPassword, role: role || 'user' },
+        select: { id: true, email: true, name: true, role: true }
+    });
+    return user; // Kembalikan user
 };
 exports.createUser = createUser;
-const getUserById = async (req, res) => {
-    try {
-        const requesterId = req.userId;
-        const requesterRole = req.userRole;
-        const userId = Number(req.params.id);
-        if (isNaN(userId)) {
-            res.status(400).json({ error: 'Invalid user ID' });
-            return;
-        }
-        if (requesterRole !== 'admin' && requesterId !== userId) {
-            res.status(403).json({ error: 'Forbidden' });
-            return;
-        }
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, email: true, name: true, role: true }
-        });
-        if (!user) {
-            res.status(404).json({ error: 'User not found' });
-            return;
-        }
-        res.json(user);
+// Fungsi getUserById di service tidak lagi mengambil `res`
+const getUserById = async (userId, requesterId, requesterRole) => {
+    if (isNaN(userId)) {
+        throw new AppError_1.default('ID pengguna tidak valid.', 400);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch user' });
+    if (requesterRole !== 'admin' && requesterId !== userId) {
+        throw new AppError_1.default('Terlarang: Anda tidak memiliki akses ke pengguna ini.', 403);
     }
+    const user = await prisma_1.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, role: true }
+    });
+    if (!user) {
+        throw new AppError_1.default('Pengguna tidak ditemukan.', 404);
+    }
+    return user; // Kembalikan user
 };
 exports.getUserById = getUserById;
-const updateUser = async (req, res) => {
-    try {
-        const requesterId = req.userId;
-        const requesterRole = req.userRole;
-        const userId = Number(req.params.id);
-        const { email, name, password, role } = req.body;
-        if (isNaN(userId)) {
-            res.status(400).json({ error: 'Invalid user ID' });
-            return;
-        }
-        if (requesterRole !== 'admin' && requesterId !== userId) {
-            res.status(403).json({ error: 'Forbidden' });
-            return;
-        }
-        const existingUser = await prisma_1.prisma.user.findUnique({ where: { id: userId } });
-        if (!existingUser) {
-            res.status(404).json({ error: 'User not found' });
-            return;
-        }
-        const dataToUpdate = {};
-        if (email) {
-            if (!isValidEmail(email)) {
-                res.status(400).json({ error: 'Invalid email format' });
-                return;
-            }
-            const emailExists = await prisma_1.prisma.user.findUnique({ where: { email } });
-            if (emailExists && emailExists.id !== userId) {
-                res.status(409).json({ error: 'Email already in use' });
-                return;
-            }
-            dataToUpdate.email = email;
-        }
-        if (name) {
-            dataToUpdate.name = name;
-        }
-        if (password) {
-            if (!isValidPassword(password)) {
-                res.status(400).json({ error: 'Password of minimum 6 characters is required' });
-                return;
-            }
-            dataToUpdate.password = await bcryptjs_1.default.hash(password, 10);
-        }
-        if (role) {
-            if (requesterRole !== 'admin') {
-                res.status(403).json({ error: 'Only admin can update role' });
-                return;
-            }
-            if (!['user', 'admin'].includes(role)) {
-                res.status(400).json({ error: 'Invalid role' });
-                return;
-            }
-            dataToUpdate.role = role;
-        }
-        const updatedUser = await prisma_1.prisma.user.update({
-            where: { id: userId },
-            data: dataToUpdate,
-            select: { id: true, email: true, name: true, role: true }
-        });
-        res.json(updatedUser);
+// Fungsi updateUser di service tidak lagi mengambil `res`
+const updateUser = async (targetUserId, updateData, // data dari req.body
+requesterId, requesterRole) => {
+    if (isNaN(targetUserId)) {
+        throw new AppError_1.default('ID pengguna tidak valid.', 400);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to update user' });
+    if (requesterRole !== 'admin' && requesterId !== targetUserId) {
+        throw new AppError_1.default('Terlarang: Anda tidak memiliki akses untuk memperbarui pengguna ini.', 403);
     }
+    const existingUser = await prisma_1.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!existingUser) {
+        throw new AppError_1.default('Pengguna tidak ditemukan.', 404);
+    }
+    const dataToUpdate = {};
+    if (updateData.email !== undefined) { // Cek jika email disediakan
+        if (!isValidEmail(updateData.email)) {
+            throw new AppError_1.default('Format email tidak valid.', 400);
+        }
+        const emailExists = await prisma_1.prisma.user.findUnique({ where: { email: updateData.email } });
+        if (emailExists && emailExists.id !== targetUserId) {
+            throw new AppError_1.default('Email sudah digunakan oleh pengguna lain.', 409);
+        }
+        dataToUpdate.email = updateData.email;
+    }
+    if (updateData.name !== undefined) {
+        dataToUpdate.name = updateData.name;
+    }
+    if (updateData.password !== undefined) {
+        if (!isValidPassword(updateData.password)) {
+            throw new AppError_1.default('Password minimal 6 karakter wajib diisi.', 400);
+        }
+        dataToUpdate.password = await bcryptjs_1.default.hash(updateData.password, 10);
+    }
+    if (updateData.role !== undefined) {
+        if (requesterRole !== 'admin') {
+            throw new AppError_1.default('Hanya admin yang dapat memperbarui peran.', 403);
+        }
+        if (!['user', 'admin'].includes(updateData.role)) {
+            throw new AppError_1.default('Peran tidak valid.', 400);
+        }
+        dataToUpdate.role = updateData.role;
+    }
+    const updatedUser = await prisma_1.prisma.user.update({
+        where: { id: targetUserId },
+        data: dataToUpdate,
+        select: { id: true, email: true, name: true, role: true }
+    });
+    return updatedUser; // Kembalikan user
 };
 exports.updateUser = updateUser;
-const deleteUser = async (req, res) => {
-    try {
-        const requesterId = req.userId;
-        const requesterRole = req.userRole;
-        const userId = Number(req.params.id);
-        if (isNaN(userId)) {
-            res.status(400).json({ error: 'Invalid user ID' });
-            return;
-        }
-        if (requesterRole !== 'admin' && requesterId !== userId) {
-            res.status(403).json({ error: 'Forbidden' });
-            return;
-        }
-        const existingUser = await prisma_1.prisma.user.findUnique({ where: { id: userId } });
-        if (!existingUser) {
-            res.status(404).json({ error: 'User not found' });
-            return;
-        }
-        await prisma_1.prisma.user.delete({ where: { id: userId } });
-        res.status(204).send();
+// Fungsi deleteUser di service tidak lagi mengambil `res`
+const deleteUser = async (targetUserId, requesterId, requesterRole) => {
+    if (isNaN(targetUserId)) {
+        throw new AppError_1.default('ID pengguna tidak valid.', 400);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to delete user' });
+    if (requesterRole !== 'admin' && requesterId !== targetUserId) {
+        throw new AppError_1.default('Terlarang: Anda tidak memiliki akses untuk menghapus pengguna ini.', 403);
     }
+    const existingUser = await prisma_1.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!existingUser) {
+        throw new AppError_1.default('Pengguna tidak ditemukan.', 404);
+    }
+    // Jika admin menghapus dirinya sendiri
+    if (requesterRole === 'admin' && requesterId === targetUserId) {
+        // Pertimbangkan apakah admin boleh menghapus dirinya sendiri.
+        // Untuk aplikasi sederhana, mungkin boleh. Untuk produksi, perlu logic khusus.
+        // Contoh: throw new AppError('Admin tidak bisa menghapus akunnya sendiri.', 403);
+    }
+    await prisma_1.prisma.user.delete({ where: { id: targetUserId } });
+    return; // Tidak mengembalikan apa-apa untuk 204 No Content
 };
 exports.deleteUser = deleteUser;
-const getProfile = async (req, res) => {
-    try {
-        const userId = req.userId;
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, email: true, name: true, role: true }
-        });
-        if (!user) {
-            res.status(404).json({ error: 'User not found' });
-            return;
-        }
-        res.json(user);
+// Fungsi getProfile di service tidak lagi mengambil `res`
+const getProfile = async (userId) => {
+    const user = await prisma_1.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, role: true }
+    });
+    if (!user) {
+        throw new AppError_1.default('Profil pengguna tidak ditemukan.', 404);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to get profile' });
-    }
+    return user; // Kembalikan user
 };
 exports.getProfile = getProfile;
-const updateProfile = async (req, res) => {
-    try {
-        const userId = req.userId;
-        const { email, name, password } = req.body;
-        const dataToUpdate = {};
-        if (email) {
-            if (!isValidEmail(email)) {
-                res.status(400).json({ error: 'Invalid email format' });
-                return;
-            }
-            const emailExists = await prisma_1.prisma.user.findUnique({ where: { email } });
-            if (emailExists && emailExists.id !== userId) {
-                res.status(409).json({ error: 'Email already in use' });
-                return;
-            }
-            dataToUpdate.email = email;
+// Fungsi updateProfile di service tidak lagi mengambil `res`
+const updateProfile = async (userId, updateData) => {
+    const dataToUpdate = {};
+    if (updateData.email !== undefined) {
+        if (!isValidEmail(updateData.email)) {
+            throw new AppError_1.default('Format email tidak valid.', 400);
         }
-        if (name) {
-            dataToUpdate.name = name;
+        const emailExists = await prisma_1.prisma.user.findUnique({ where: { email: updateData.email } });
+        if (emailExists && emailExists.id !== userId) {
+            throw new AppError_1.default('Email sudah digunakan oleh pengguna lain.', 409);
         }
-        if (password) {
-            if (!isValidPassword(password)) {
-                res.status(400).json({ error: 'Password of minimum 6 characters is required' });
-                return;
-            }
-            dataToUpdate.password = await bcryptjs_1.default.hash(password, 10);
-        }
-        const updatedUser = await prisma_1.prisma.user.update({
-            where: { id: userId },
-            data: dataToUpdate,
-            select: { id: true, email: true, name: true, role: true }
-        });
-        res.json(updatedUser);
+        dataToUpdate.email = updateData.email;
     }
-    catch {
-        res.status(500).json({ error: 'Failed to update profile' });
+    if (updateData.name !== undefined) {
+        dataToUpdate.name = updateData.name;
     }
+    if (updateData.password !== undefined) {
+        if (!isValidPassword(updateData.password)) {
+            throw new AppError_1.default('Password minimal 6 karakter wajib diisi.', 400);
+        }
+        dataToUpdate.password = await bcryptjs_1.default.hash(updateData.password, 10);
+    }
+    const updatedUser = await prisma_1.prisma.user.update({
+        where: { id: userId },
+        data: dataToUpdate,
+        select: { id: true, email: true, name: true, role: true }
+    });
+    return updatedUser; // Kembalikan user
 };
 exports.updateProfile = updateProfile;
+// Get all users (admin only)
+const getAllUsers = async (requesterRole) => {
+    if (requesterRole !== 'admin') {
+        throw new AppError_1.default('Terlarang: Hanya admin yang dapat melihat daftar pengguna.', 403);
+    }
+    const users = await prisma_1.prisma.user.findMany({
+        select: { id: true, email: true, name: true, role: true },
+        orderBy: { id: 'asc' }
+    });
+    return users;
+};
+exports.getAllUsers = getAllUsers;

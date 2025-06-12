@@ -32,17 +32,26 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSymptomsByUser = exports.deleteSymptom = exports.updateSymptom = exports.createSymptom = exports.getSymptomById = exports.getSymptoms = void 0;
 const symptomService = __importStar(require("../services/symptomService"));
+const AppError_1 = __importDefault(require("../utils/AppError")); // Import AppError
 const getSymptoms = async (req, res) => {
     try {
         const userId = req.userId;
         const symptoms = await symptomService.getSymptoms(userId);
         res.json(symptoms);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch symptoms' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil daftar gejala.' });
+        }
     }
 };
 exports.getSymptoms = getSymptoms;
@@ -50,23 +59,24 @@ const getSymptomById = async (req, res) => {
     try {
         const symptomId = Number(req.params.id);
         if (isNaN(symptomId)) {
-            res.status(400).json({ error: 'Invalid symptom ID' });
+            res.status(400).json({ error: 'ID gejala tidak valid.' });
             return;
         }
-        const { userId, role } = req;
-        const symptom = await symptomService.getSymptomById(symptomId);
-        if (!symptom) {
-            res.status(404).json({ error: 'Symptom not found' });
-            return;
-        }
-        if (role !== 'admin' && symptom.userId !== userId) {
-            res.status(403).json({ error: 'Unauthorized to view this symptom' });
+        const { userId, userRole } = req; // Gunakan langsung dari req
+        const symptom = await symptomService.getSymptomById(symptomId); // Service akan melempar error jika tidak ditemukan
+        if (userRole !== 'admin' && symptom.userId !== userId) {
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses ke gejala ini.' });
             return;
         }
         res.json(symptom);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch symptom' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil detail gejala.' });
+        }
     }
 };
 exports.getSymptomById = getSymptomById;
@@ -77,8 +87,13 @@ const createSymptom = async (req, res) => {
         const newSymptom = await symptomService.createSymptom(userId, date, mood, symptoms);
         res.status(201).json(newSymptom);
     }
-    catch (err) {
-        res.status(400).json({ error: err.message });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal membuat gejala baru.' });
+        }
     }
 };
 exports.createSymptom = createSymptom;
@@ -86,25 +101,26 @@ const updateSymptom = async (req, res) => {
     try {
         const symptomId = Number(req.params.id);
         if (isNaN(symptomId)) {
-            res.status(400).json({ error: 'Invalid symptom ID' });
+            res.status(400).json({ error: 'ID gejala tidak valid.' });
             return;
         }
-        const { userId, role } = req;
-        const existing = await symptomService.getSymptomById(symptomId);
-        if (!existing) {
-            res.status(404).json({ error: 'Symptom not found' });
-            return;
-        }
-        if (role !== 'admin' && existing.userId !== userId) {
-            res.status(403).json({ error: 'Unauthorized to update this symptom' });
+        const { userId, userRole } = req;
+        const existing = await symptomService.getSymptomById(symptomId); // Ini akan melempar AppError jika tidak ditemukan
+        if (userRole !== 'admin' && existing.userId !== userId) {
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses untuk memperbarui gejala ini.' });
             return;
         }
         const { date, mood, symptoms } = req.body;
         const updated = await symptomService.updateSymptom(symptomId, date, mood, symptoms);
         res.json(updated);
     }
-    catch (err) {
-        res.status(400).json({ error: err.message || 'Failed to update symptom' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal memperbarui gejala.' });
+        }
     }
 };
 exports.updateSymptom = updateSymptom;
@@ -112,44 +128,51 @@ const deleteSymptom = async (req, res) => {
     try {
         const symptomId = Number(req.params.id);
         if (isNaN(symptomId)) {
-            res.status(400).json({ error: 'Invalid symptom ID' });
+            res.status(400).json({ error: 'ID gejala tidak valid.' });
             return;
         }
-        const { userId, role } = req;
-        const existing = await symptomService.getSymptomById(symptomId);
-        if (!existing) {
-            res.status(404).json({ error: 'Symptom not found' });
-            return;
-        }
-        if (role !== 'admin' && existing.userId !== userId) {
-            res.status(403).json({ error: 'Unauthorized to delete this symptom' });
+        const { userId, userRole } = req;
+        const existing = await symptomService.getSymptomById(symptomId); // Ini akan melempar AppError jika tidak ditemukan
+        if (userRole !== 'admin' && existing.userId !== userId) {
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses untuk menghapus gejala ini.' });
             return;
         }
         await symptomService.deleteSymptom(symptomId);
         res.status(204).send();
     }
-    catch {
-        res.status(500).json({ error: 'Failed to delete symptom' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal menghapus gejala.' });
+        }
     }
 };
 exports.deleteSymptom = deleteSymptom;
 const getSymptomsByUser = async (req, res) => {
     try {
-        const role = req.role;
-        if (role !== 'admin') {
-            res.status(403).json({ error: 'Forbidden' });
+        const userRole = req.userRole;
+        // Middleware authorizeRole sudah mengurus ini, tapi validasi di controller/service juga bisa
+        if (userRole !== 'admin') {
+            res.status(403).json({ error: 'Terlarang.' });
             return;
         }
         const userId = Number(req.params.userId);
         if (isNaN(userId)) {
-            res.status(400).json({ error: 'Invalid user ID' });
+            res.status(400).json({ error: 'ID pengguna tidak valid.' });
             return;
         }
         const symptoms = await symptomService.getSymptoms(userId);
         res.json(symptoms);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch symptoms by user' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil gejala berdasarkan pengguna.' });
+        }
     }
 };
 exports.getSymptomsByUser = getSymptomsByUser;

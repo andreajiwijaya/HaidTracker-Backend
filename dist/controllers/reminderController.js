@@ -32,17 +32,27 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getReminderById = exports.deleteReminder = exports.updateReminder = exports.createReminder = exports.getUserReminders = exports.getAllRemindersForAdmin = void 0;
 const reminderService = __importStar(require("../services/reminderService"));
+const AppError_1 = __importDefault(require("../utils/AppError")); // Import AppError
 // 1. Get all reminders for admin
 const getAllRemindersForAdmin = async (req, res) => {
     try {
+        // Middleware authorizeRole sudah mengurus otorisasi admin
         const reminders = await reminderService.getAllRemindersForAdmin();
         res.json(reminders);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch reminders for admin' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil semua pengingat untuk admin.' });
+        }
     }
 };
 exports.getAllRemindersForAdmin = getAllRemindersForAdmin;
@@ -53,8 +63,13 @@ const getUserReminders = async (req, res) => {
         const reminders = await reminderService.getUserReminders(userId);
         res.json(reminders);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch reminders' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil pengingat Anda.' });
+        }
     }
 };
 exports.getUserReminders = getUserReminders;
@@ -66,8 +81,13 @@ const createReminder = async (req, res) => {
         const reminder = await reminderService.createReminder(userId, title, description, remindAt);
         res.status(201).json(reminder);
     }
-    catch (err) {
-        res.status(err.status || 500).json({ error: err.message || 'Failed to create reminder' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal membuat pengingat.' });
+        }
     }
 };
 exports.createReminder = createReminder;
@@ -75,14 +95,24 @@ exports.createReminder = createReminder;
 const updateReminder = async (req, res) => {
     try {
         const reminderId = Number(req.params.id);
+        // Perbaikan: Validasi ID di controller
+        if (isNaN(reminderId)) {
+            res.status(400).json({ error: 'ID pengingat tidak valid.' });
+            return;
+        }
         const userId = req.userId;
         const userRole = req.userRole;
         const { title, description, remindAt, isActive } = req.body;
         const updatedReminder = await reminderService.updateReminder(reminderId, userId, userRole, title, description, remindAt, isActive);
         res.json(updatedReminder);
     }
-    catch (err) {
-        res.status(err.status || 500).json({ error: err.message || 'Failed to update reminder' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal memperbarui pengingat.' });
+        }
     }
 };
 exports.updateReminder = updateReminder;
@@ -90,13 +120,23 @@ exports.updateReminder = updateReminder;
 const deleteReminder = async (req, res) => {
     try {
         const reminderId = Number(req.params.id);
+        // Perbaikan: Validasi ID di controller
+        if (isNaN(reminderId)) {
+            res.status(400).json({ error: 'ID pengingat tidak valid.' });
+            return;
+        }
         const userId = req.userId;
         const userRole = req.userRole;
         await reminderService.deleteReminder(reminderId, userId, userRole);
         res.status(204).send();
     }
-    catch (err) {
-        res.status(err.status || 500).json({ error: err.message || 'Failed to delete reminder' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal menghapus pengingat.' });
+        }
     }
 };
 exports.deleteReminder = deleteReminder;
@@ -104,13 +144,23 @@ exports.deleteReminder = deleteReminder;
 const getReminderById = async (req, res) => {
     try {
         const reminderId = Number(req.params.id);
+        // Perbaikan: Validasi ID di controller
+        if (isNaN(reminderId)) {
+            res.status(400).json({ error: 'ID pengingat tidak valid.' });
+            return;
+        }
         const userId = req.userId;
         const userRole = req.userRole;
         const reminder = await reminderService.getReminderById(reminderId, userId, userRole);
         res.json(reminder);
     }
-    catch (err) {
-        res.status(err.status || 500).json({ error: err.message || 'Failed to fetch reminder' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil detail pengingat.' });
+        }
     }
 };
 exports.getReminderById = getReminderById;

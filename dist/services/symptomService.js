@@ -1,7 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteSymptom = exports.updateSymptom = exports.createSymptom = exports.getSymptomById = exports.getSymptoms = void 0;
+// src/services/symptomService.ts
 const prisma_1 = require("../prisma");
+const AppError_1 = __importDefault(require("../utils/AppError")); // Import AppError
 const isValidDate = (dateStr) => {
     return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
 };
@@ -13,18 +18,25 @@ const getSymptoms = async (userId) => {
 };
 exports.getSymptoms = getSymptoms;
 const getSymptomById = async (id) => {
-    return prisma_1.prisma.symptom.findUnique({ where: { id } });
+    if (isNaN(id)) {
+        throw new AppError_1.default('ID gejala tidak valid.', 400);
+    }
+    const symptom = await prisma_1.prisma.symptom.findUnique({ where: { id } });
+    if (!symptom) {
+        throw new AppError_1.default('Gejala tidak ditemukan.', 404);
+    }
+    return symptom;
 };
 exports.getSymptomById = getSymptomById;
 const createSymptom = async (userId, date, mood, symptoms) => {
     if (!date || !isValidDate(date)) {
-        throw new Error('Date is required and must be valid ISO date');
+        throw new AppError_1.default('Tanggal wajib diisi dan harus format tanggal valid (ISO).', 400);
     }
     if (!mood || typeof mood !== 'string' || mood.trim() === '') {
-        throw new Error('Mood is required and must be a non-empty string');
+        throw new AppError_1.default('Suasana hati wajib diisi dan harus berupa string yang tidak kosong.', 400);
     }
     if (!symptoms || typeof symptoms !== 'string' || symptoms.trim() === '') {
-        throw new Error('Symptoms are required and must be a non-empty string');
+        throw new AppError_1.default('Gejala wajib diisi dan harus berupa string yang tidak kosong.', 400);
     }
     return prisma_1.prisma.symptom.create({
         data: {
@@ -37,29 +49,46 @@ const createSymptom = async (userId, date, mood, symptoms) => {
 };
 exports.createSymptom = createSymptom;
 const updateSymptom = async (id, date, mood, symptoms) => {
-    if (date !== undefined && date !== null && !isValidDate(date)) {
-        throw new Error('Date must be a valid ISO date if provided');
-    }
-    if (mood !== undefined && mood !== null && (typeof mood !== 'string' || mood.trim() === '')) {
-        throw new Error('Mood must be a non-empty string if provided');
-    }
-    if (symptoms !== undefined && symptoms !== null && (typeof symptoms !== 'string' || symptoms.trim() === '')) {
-        throw new Error('Symptoms must be a non-empty string if provided');
+    if (isNaN(id)) {
+        throw new AppError_1.default('ID gejala tidak valid.', 400);
     }
     const existing = await prisma_1.prisma.symptom.findUnique({ where: { id } });
-    if (!existing)
-        return null;
+    if (!existing) {
+        throw new AppError_1.default('Gejala tidak ditemukan.', 404);
+    }
+    const dataToUpdate = {};
+    if (date !== undefined) {
+        if (!isValidDate(date)) {
+            throw new AppError_1.default('Tanggal harus format tanggal valid (ISO) jika disediakan.', 400);
+        }
+        dataToUpdate.date = new Date(date);
+    }
+    if (mood !== undefined) {
+        if (typeof mood !== 'string' || mood.trim() === '') {
+            throw new AppError_1.default('Suasana hati harus berupa string yang tidak kosong jika disediakan.', 400);
+        }
+        dataToUpdate.mood = mood.trim();
+    }
+    if (symptoms !== undefined) {
+        if (typeof symptoms !== 'string' || symptoms.trim() === '') {
+            throw new AppError_1.default('Gejala harus berupa string yang tidak kosong jika disediakan.', 400);
+        }
+        dataToUpdate.symptoms = symptoms.trim();
+    }
     return prisma_1.prisma.symptom.update({
         where: { id },
-        data: {
-            date: date ? new Date(date) : existing.date,
-            mood: mood ? mood.trim() : existing.mood,
-            symptoms: symptoms ? symptoms.trim() : existing.symptoms,
-        },
+        data: dataToUpdate,
     });
 };
 exports.updateSymptom = updateSymptom;
 const deleteSymptom = async (id) => {
+    if (isNaN(id)) {
+        throw new AppError_1.default('ID gejala tidak valid.', 400);
+    }
+    const existing = await prisma_1.prisma.symptom.findUnique({ where: { id } });
+    if (!existing) {
+        throw new AppError_1.default('Gejala tidak ditemukan.', 404);
+    }
     return prisma_1.prisma.symptom.delete({ where: { id } });
 };
 exports.deleteSymptom = deleteSymptom;

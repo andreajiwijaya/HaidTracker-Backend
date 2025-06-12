@@ -32,66 +32,66 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCycleStats = exports.searchCycles = exports.deleteCycle = exports.updateCycle = exports.createCycle = exports.getCycleById = exports.getCycles = void 0;
 const cycleService = __importStar(require("../services/cycleService"));
+const AppError_1 = __importDefault(require("../utils/AppError")); // Import AppError
+// Helper untuk validasi tanggal (dapat dipindah ke utils/validation.ts jika sering dipakai)
 const isValidDate = (dateStr) => typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
-const parseUserId = (req) => req.userId;
-const parseUserRole = (req) => req.role;
 const getCycles = async (req, res) => {
     try {
-        const userId = parseUserId(req);
-        const role = parseUserRole(req);
+        const userId = req.userId;
+        const role = req.userRole;
         const cycles = await cycleService.getAllCycles(userId, role);
         res.json(cycles);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch cycles' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil daftar siklus.' });
+        }
     }
 };
 exports.getCycles = getCycles;
 const getCycleById = async (req, res) => {
     try {
-        const userId = parseUserId(req);
-        const role = parseUserRole(req);
+        const userId = req.userId;
+        const role = req.userRole;
         const cycleId = Number(req.params.id);
+        // Validasi dasar ID bisa tetap di controller
         if (isNaN(cycleId)) {
-            res.status(400).json({ error: 'Invalid cycle ID' });
+            res.status(400).json({ error: 'ID siklus tidak valid.' });
             return;
         }
-        const cycle = await cycleService.getCycle(cycleId);
-        if (!cycle) {
-            res.status(404).json({ error: 'Cycle not found' });
-            return;
-        }
+        // Perbaikan: Memanggil service yang sudah melempar AppError
+        const cycle = await cycleService.getCycle(cycleId); // Service akan menangani not found
         if (role !== 'admin' && cycle.userId !== userId) {
-            res.status(403).json({ error: 'Unauthorized to view this cycle' });
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses ke siklus ini.' });
             return;
         }
         res.json(cycle);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch cycle' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil detail siklus.' });
+        }
     }
 };
 exports.getCycleById = getCycleById;
 const createCycle = async (req, res) => {
     try {
-        const userId = parseUserId(req);
-        const role = parseUserRole(req);
+        const userId = req.userId;
+        const role = req.userRole;
         const { startDate, endDate, note, userId: targetUserId } = req.body;
-        if (!startDate || !isValidDate(startDate)) {
-            res.status(400).json({ error: 'startDate is required and must be a valid date' });
-            return;
-        }
-        if (endDate && !isValidDate(endDate)) {
-            res.status(400).json({ error: 'endDate must be a valid date if provided' });
-            return;
-        }
-        if (note && typeof note !== 'string') {
-            res.status(400).json({ error: 'note must be a string if provided' });
-            return;
-        }
+        // Perbaikan: Validasi dipindahkan ke service, controller hanya memanggil dan menangkap error
         const cycle = await cycleService.createCycleEntry(userId, role, {
             startDate,
             endDate,
@@ -100,80 +100,77 @@ const createCycle = async (req, res) => {
         });
         res.status(201).json(cycle);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to create cycle' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal membuat siklus baru.' });
+        }
     }
 };
 exports.createCycle = createCycle;
 const updateCycle = async (req, res) => {
     try {
-        const userId = parseUserId(req);
-        const role = parseUserRole(req);
+        const userId = req.userId;
+        const role = req.userRole;
         const cycleId = Number(req.params.id);
         if (isNaN(cycleId)) {
-            res.status(400).json({ error: 'Invalid cycle ID' });
+            res.status(400).json({ error: 'ID siklus tidak valid.' });
             return;
         }
-        const existing = await cycleService.getCycle(cycleId);
-        if (!existing) {
-            res.status(404).json({ error: 'Cycle not found' });
-            return;
-        }
+        // Perbaikan: Ambil siklus dulu untuk otorisasi
+        const existing = await cycleService.getCycle(cycleId); // Ini akan melempar AppError jika tidak ditemukan
         if (role !== 'admin' && existing.userId !== userId) {
-            res.status(403).json({ error: 'Unauthorized to update this cycle' });
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses untuk memperbarui siklus ini.' });
             return;
         }
         const { startDate, endDate, note } = req.body;
-        if (startDate !== undefined && !isValidDate(startDate)) {
-            res.status(400).json({ error: 'startDate must be a valid date if provided' });
-            return;
-        }
-        if (endDate !== undefined && endDate !== null && !isValidDate(endDate)) {
-            res.status(400).json({ error: 'endDate must be a valid date or null if provided' });
-            return;
-        }
-        if (note !== undefined && typeof note !== 'string' && note !== null) {
-            res.status(400).json({ error: 'note must be a string or null if provided' });
-            return;
-        }
         const updated = await cycleService.updateCycleEntry(cycleId, { startDate, endDate, note });
         res.json(updated);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to update cycle' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal memperbarui siklus.' });
+        }
     }
 };
 exports.updateCycle = updateCycle;
 const deleteCycle = async (req, res) => {
     try {
-        const userId = parseUserId(req);
-        const role = parseUserRole(req);
+        const userId = req.userId;
+        const role = req.userRole;
         const cycleId = Number(req.params.id);
         if (isNaN(cycleId)) {
-            res.status(400).json({ error: 'Invalid cycle ID' });
+            res.status(400).json({ error: 'ID siklus tidak valid.' });
             return;
         }
-        const existing = await cycleService.getCycle(cycleId);
-        if (!existing) {
-            res.status(404).json({ error: 'Cycle not found' });
-            return;
-        }
+        // Perbaikan: Ambil siklus dulu untuk otorisasi
+        const existing = await cycleService.getCycle(cycleId); // Ini akan melempar AppError jika tidak ditemukan
         if (role !== 'admin' && existing.userId !== userId) {
-            res.status(403).json({ error: 'Unauthorized to delete this cycle' });
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses untuk menghapus siklus ini.' });
             return;
         }
         await cycleService.deleteCycleEntry(cycleId);
-        res.status(204).send();
+        res.status(204).send(); // 204 No Content for successful deletion
     }
-    catch {
-        res.status(500).json({ error: 'Failed to delete cycle' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal menghapus siklus.' });
+        }
     }
 };
 exports.deleteCycle = deleteCycle;
 const searchCycles = async (req, res) => {
     try {
-        const userId = parseUserId(req);
-        const role = parseUserRole(req);
+        const userId = req.userId;
+        const role = req.userRole;
         const { noteKeyword, startDate } = req.query;
         const cycles = await cycleService.searchUserCycles(userId, role, {
             noteKeyword: noteKeyword,
@@ -181,23 +178,35 @@ const searchCycles = async (req, res) => {
         });
         res.json(cycles);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to search cycles' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mencari siklus.' });
+        }
     }
 };
 exports.searchCycles = searchCycles;
 const getCycleStats = async (req, res) => {
+    console.log('DEBUG: cycleController/getCycleStats - User ID:', req.userId, 'Role:', req.userRole);
     try {
-        const role = parseUserRole(req);
+        const role = req.userRole;
+        // Middleware authorizeRole sudah mengurus ini, tapi validasi di controller/service juga bisa
         if (role !== 'admin') {
-            res.status(403).json({ error: 'Unauthorized to access statistics' });
+            res.status(403).json({ error: 'Terlarang: Anda tidak memiliki akses ke statistik.' });
             return;
         }
         const stats = await cycleService.getCycleStatistics();
         res.json(stats);
     }
-    catch {
-        res.status(500).json({ error: 'Failed to fetch cycle statistics' });
+    catch (error) {
+        if (error instanceof AppError_1.default) {
+            res.status(error.status).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: 'Gagal mengambil statistik siklus.' });
+        }
     }
 };
 exports.getCycleStats = getCycleStats;

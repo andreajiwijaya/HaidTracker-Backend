@@ -8,18 +8,19 @@ exports.loginUser = exports.registerUser = void 0;
 const prisma_1 = require("../prisma");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const AppError_1 = __importDefault(require("../utils/AppError")); // Import AppError
+const JWT_SECRET = process.env.JWT_SECRET || 'trackerhaidkey'; // Pastikan ini diatur di .env!
 const registerUser = async ({ email, name, password, role }) => {
     if (!email || !password) {
-        throw { status: 400, message: 'Email and password are required' };
+        throw new AppError_1.default('Email dan password wajib diisi.', 400);
     }
     const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-        throw { status: 400, message: 'User already exists' };
+        throw new AppError_1.default('Pengguna dengan email ini sudah terdaftar.', 409); // 409 Conflict
     }
     const hashedPassword = await bcryptjs_1.default.hash(password, 10);
     const validRoles = ['user', 'admin'];
-    const assignedRole = validRoles.includes(role || '') ? role : 'user';
+    const assignedRole = (role && validRoles.includes(role)) ? role : 'user';
     const user = await prisma_1.prisma.user.create({
         data: {
             email,
@@ -42,15 +43,15 @@ const registerUser = async ({ email, name, password, role }) => {
 exports.registerUser = registerUser;
 const loginUser = async ({ email, password }) => {
     if (!email || !password) {
-        throw { status: 400, message: 'Email dan password wajib diisi' };
+        throw new AppError_1.default('Email dan password wajib diisi.', 400);
     }
     const user = await prisma_1.prisma.user.findUnique({ where: { email } });
     if (!user || !user.password) {
-        throw { status: 401, message: 'Email atau password salah' };
+        throw new AppError_1.default('Email atau password salah.', 401);
     }
     const isValid = await bcryptjs_1.default.compare(password, user.password);
     if (!isValid) {
-        throw { status: 401, message: 'Email atau password salah' };
+        throw new AppError_1.default('Email atau password salah.', 401);
     }
     const token = jsonwebtoken_1.default.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     return {
