@@ -1,19 +1,32 @@
-// src/controllers/userController.ts
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import * as userService from '../services/userService';
-import AppError from '../utils/AppError'; // Import AppError
+import AppError from '../utils/AppError';
 
 // Create user (only admin)
 export const createUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const user = await userService.createUser(req.body, req.userRole!); // userService akan melempar AppError
-    res.status(201).json(user); // Kembalikan user yang dibuat
+    const user = await userService.createUser(req.body, req.userRole!);
+    res.status(201).json(user);
   } catch (error: any) {
     if (error instanceof AppError) {
       res.status(error.status).json({ error: error.message });
     } else {
       res.status(500).json({ error: 'Gagal membuat pengguna baru.' });
+    }
+  }
+};
+
+// Get all users (admin only)
+export const getAllUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const users = await userService.getAllUsers(req.userRole!);
+    res.json(users);
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Gagal mengambil daftar pengguna.' });
     }
   }
 };
@@ -26,7 +39,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
       res.status(400).json({ error: 'ID pengguna tidak valid.' });
       return;
     }
-    const user = await userService.getUserById(userId, req.userId!, req.userRole!); // userService akan melempar AppError
+    const user = await userService.getUserById(userId, req.userId!, req.userRole!);
     res.json(user);
   } catch (error: any) {
     if (error instanceof AppError) {
@@ -45,7 +58,7 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(400).json({ error: 'ID pengguna tidak valid.' });
       return;
     }
-    const updatedUser = await userService.updateUser(targetUserId, req.body, req.userId!, req.userRole!); // userService akan melempar AppError
+    const updatedUser = await userService.updateUser(targetUserId, req.body, req.userId!, req.userRole!);
     res.json(updatedUser);
   } catch (error: any) {
     if (error instanceof AppError) {
@@ -64,7 +77,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(400).json({ error: 'ID pengguna tidak valid.' });
       return;
     }
-    await userService.deleteUser(targetUserId, req.userId!, req.userRole!); // userService akan melempar AppError
+    await userService.deleteUser(targetUserId, req.userId!, req.userRole!);
     res.status(204).send();
   } catch (error: any) {
     if (error instanceof AppError) {
@@ -78,7 +91,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
 // Get own profile (self only)
 export const getProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const user = await userService.getProfile(req.userId!); // userService akan melempar AppError
+    const user = await userService.getProfile(req.userId!);
     res.json(user);
   } catch (error: any) {
     if (error instanceof AppError) {
@@ -92,7 +105,7 @@ export const getProfile = async (req: AuthenticatedRequest, res: Response): Prom
 // Update own profile (self only)
 export const updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const updatedUser = await userService.updateProfile(req.userId!, req.body); // userService akan melempar AppError
+    const updatedUser = await userService.updateProfile(req.userId!, req.body);
     res.json(updatedUser);
   } catch (error: any) {
     if (error instanceof AppError) {

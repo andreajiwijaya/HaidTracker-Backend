@@ -200,3 +200,17 @@ export const updateProfile = async (userId: number, updateData: any) => {
   });
   return updatedUser; // Kembalikan user
 };
+
+// Get all users (admin only)
+export const getAllUsers = async (requesterRole: string) => {
+  if (requesterRole !== 'admin') {
+    throw new AppError('Terlarang: Hanya admin yang dapat melihat daftar pengguna.', 403);
+  }
+
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, name: true, role: true },
+    orderBy: { id: 'asc' }
+  });
+
+  return users;
+};

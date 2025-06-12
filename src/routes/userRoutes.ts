@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getUserById,
+  getAllUsers, // <-- import baru
   createUser,
   updateUser,
   deleteUser,
@@ -13,17 +14,19 @@ import { authorizeRole } from '../middleware/authorizeMiddleware';
 
 const router = express.Router();
 
-// Semua route di bawah harus autentikasi dulu
 router.use(authenticateToken);
 
 // Route untuk create user (hanya admin)
 router.post('/', authorizeRole('admin'), createUser);
 
-// Pastikan route spesifik 'profile' diletakkan sebelum parameter ':id'
+// Route untuk get all users (hanya admin)
+router.get('/', authorizeRole('admin'), getAllUsers);
+
+// Route khusus profile
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 
-// Routes user berdasarkan id (admin atau user itu sendiri)
+// Route user by id
 router.get('/:id', getUserById);
 router.put('/:id', updateUser);
 router.delete('/:id', deleteUser);
