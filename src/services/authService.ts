@@ -2,8 +2,9 @@
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import AppError from '../utils/AppError'; // Import AppError
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey'; // Pastikan ini diatur di .env!
 
 interface AuthPayload {
   email: string;
@@ -14,18 +15,18 @@ interface AuthPayload {
 
 export const registerUser = async ({ email, name, password, role }: AuthPayload) => {
   if (!email || !password) {
-    throw { status: 400, message: 'Email and password are required' };
+    throw new AppError('Email dan password wajib diisi.', 400);
   }
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    throw { status: 400, message: 'User already exists' };
+    throw new AppError('Pengguna dengan email ini sudah terdaftar.', 409); // 409 Conflict
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const validRoles = ['user', 'admin'];
-  const assignedRole = validRoles.includes(role || '') ? role : 'user';
+  const assignedRole = (role && validRoles.includes(role)) ? role : 'user';
 
   const user = await prisma.user.create({
     data: {
@@ -55,17 +56,17 @@ export const registerUser = async ({ email, name, password, role }: AuthPayload)
 
 export const loginUser = async ({ email, password }: AuthPayload) => {
   if (!email || !password) {
-    throw { status: 400, message: 'Email dan password wajib diisi' };
+    throw new AppError('Email dan password wajib diisi.', 400);
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.password) {
-    throw { status: 401, message: 'Email atau password salah' };
+    throw new AppError('Email atau password salah.', 401);
   }
 
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) {
-    throw { status: 401, message: 'Email atau password salah' };
+    throw new AppError('Email atau password salah.', 401);
   }
 
   const token = jwt.sign(

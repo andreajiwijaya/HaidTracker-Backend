@@ -1,17 +1,16 @@
 // src/middleware/authorizeMiddleware.ts
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from './authMiddleware';
+import AppError from '../utils/AppError';
 
 export const authorizeRole = (requiredRole: string) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.userRole) {
-      res.status(401).json({ error: 'User role not found, unauthorized' });
-      return;
+      throw new AppError('Peran pengguna tidak ditemukan, tidak terotorisasi.', 401);
     }
 
     if (req.userRole !== requiredRole) {
-      res.status(403).json({ error: 'Forbidden: insufficient rights' });
-      return;
+      throw new AppError('Terlarang: hak akses tidak mencukupi.', 403);
     }
 
     next();

@@ -1,6 +1,7 @@
 // src/middleware/authMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import AppError from '../utils/AppError';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
@@ -23,8 +24,7 @@ export const authenticateToken = (
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    res.status(401).json({ error: 'Access token missing' });
-    return;
+    throw new AppError('Token akses tidak ada.', 401);
   }
 
   try {
@@ -32,7 +32,7 @@ export const authenticateToken = (
     req.userId = payload.userId;
     req.userRole = payload.role;
     next();
-  } catch {
-    res.status(403).json({ error: 'Invalid or expired token' });
+  } catch (error) {
+    throw new AppError('Token tidak valid atau kedaluwarsa.', 403);
   }
 };

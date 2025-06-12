@@ -1,4 +1,6 @@
+// src/services/symptomService.ts
 import { prisma } from '../prisma';
+import AppError from '../utils/AppError'; // Import AppError
 
 const isValidDate = (dateStr: any): boolean => {
   return typeof dateStr === 'string' && !isNaN(Date.parse(dateStr));
@@ -12,18 +14,25 @@ export const getSymptoms = async (userId: number) => {
 };
 
 export const getSymptomById = async (id: number) => {
-  return prisma.symptom.findUnique({ where: { id } });
+  if (isNaN(id)) {
+    throw new AppError('ID gejala tidak valid.', 400);
+  }
+  const symptom = await prisma.symptom.findUnique({ where: { id } });
+  if (!symptom) {
+    throw new AppError('Gejala tidak ditemukan.', 404);
+  }
+  return symptom;
 };
 
-export const createSymptom = async (userId: number, date: any, mood: any, symptoms: any) => {
+export const createSymptom = async (userId: number, date: string, mood: string, symptoms: string) => {
   if (!date || !isValidDate(date)) {
-    throw new Error('Date is required and must be valid ISO date');
+    throw new AppError('Tanggal wajib diisi dan harus format tanggal valid (ISO).', 400);
   }
   if (!mood || typeof mood !== 'string' || mood.trim() === '') {
-    throw new Error('Mood is required and must be a non-empty string');
+    throw new AppError('Suasana hati wajib diisi dan harus berupa string yang tidak kosong.', 400);
   }
   if (!symptoms || typeof symptoms !== 'string' || symptoms.trim() === '') {
-    throw new Error('Symptoms are required and must be a non-empty string');
+    throw new AppError('Gejala wajib diisi dan harus berupa string yang tidak kosong.', 400);
   }
 
   return prisma.symptom.create({
@@ -36,30 +45,50 @@ export const createSymptom = async (userId: number, date: any, mood: any, sympto
   });
 };
 
-export const updateSymptom = async (id: number, date?: any, mood?: any, symptoms?: any) => {
-  if (date !== undefined && date !== null && !isValidDate(date)) {
-    throw new Error('Date must be a valid ISO date if provided');
-  }
-  if (mood !== undefined && mood !== null && (typeof mood !== 'string' || mood.trim() === '')) {
-    throw new Error('Mood must be a non-empty string if provided');
-  }
-  if (symptoms !== undefined && symptoms !== null && (typeof symptoms !== 'string' || symptoms.trim() === '')) {
-    throw new Error('Symptoms must be a non-empty string if provided');
+export const updateSymptom = async (id: number, date?: string, mood?: string, symptoms?: string) => {
+  if (isNaN(id)) {
+    throw new AppError('ID gejala tidak valid.', 400);
   }
 
   const existing = await prisma.symptom.findUnique({ where: { id } });
-  if (!existing) return null;
+  if (!existing) {
+    throw new AppError('Gejala tidak ditemukan.', 404);
+  }
+
+  const dataToUpdate: any = {};
+
+  if (date !== undefined) {
+    if (!isValidDate(date)) {
+      throw new AppError('Tanggal harus format tanggal valid (ISO) jika disediakan.', 400);
+    }
+    dataToUpdate.date = new Date(date);
+  }
+  if (mood !== undefined) {
+    if (typeof mood !== 'string' || mood.trim() === '') {
+      throw new AppError('Suasana hati harus berupa string yang tidak kosong jika disediakan.', 400);
+    }
+    dataToUpdate.mood = mood.trim();
+  }
+  if (symptoms !== undefined) {
+    if (typeof symptoms !== 'string' || symptoms.trim() === '') {
+      throw new AppError('Gejala harus berupa string yang tidak kosong jika disediakan.', 400);
+    }
+    dataToUpdate.symptoms = symptoms.trim();
+  }
 
   return prisma.symptom.update({
     where: { id },
-    data: {
-      date: date ? new Date(date) : existing.date,
-      mood: mood ? mood.trim() : existing.mood,
-      symptoms: symptoms ? symptoms.trim() : existing.symptoms,
-    },
+    data: dataToUpdate,
   });
 };
 
 export const deleteSymptom = async (id: number) => {
+  if (isNaN(id)) {
+    throw new AppError('ID gejala tidak valid.', 400);
+  }
+  const existing = await prisma.symptom.findUnique({ where: { id } });
+  if (!existing) {
+    throw new AppError('Gejala tidak ditemukan.', 404);
+  }
   return prisma.symptom.delete({ where: { id } });
 };
