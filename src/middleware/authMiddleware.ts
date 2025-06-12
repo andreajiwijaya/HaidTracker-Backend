@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import AppError from '../utils/AppError';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tracker-haid-key-1';
+const JWT_SECRET = process.env.JWT_SECRET || 'trackerhaidkey';
 
 export interface AuthenticatedRequest extends Request {
   userId?: number;
